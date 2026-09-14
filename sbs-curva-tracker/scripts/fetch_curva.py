@@ -113,13 +113,13 @@ def descargar_excel(tipo_curva: str, fecha_inicio: date, fecha_fin: date, headfu
 def parsear_excel(path: Path) -> list[dict]:
     """
     Convierte el archivo exportado por SBS a una lista de registros:
-    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo>": tasa_pct, ...}}, ...]
+    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo_dias>": tasa_pct, ...}}, ...]
 
-    El export de SBS trae 1-2 filas de título/metadata antes del encabezado
-    real, así que el parser busca la fila que contiene "fecha" en las
-    primeras filas en vez de asumir que el encabezado está en la fila 0. Si
-    el layout viene distinto, lanza un error claro para poder ajustar rápido
-    (revisar debug/*.xlsx en los artifacts del run que falló).
+    El layout exacto del archivo no está documentado públicamente, así que el
+    parser es defensivo: busca una columna de fecha y trata el resto de
+    columnas numéricas como plazos (en días). Si el layout viene distinto,
+    lanza un error claro con las columnas encontradas para poder ajustar
+    rápido (revisar debug/*.xlsx en los artifacts del run que falló).
     """
     def _cargar(header_row):
         try:
@@ -127,7 +127,11 @@ def parsear_excel(path: Path) -> list[dict]:
         except Exception:
             return pd.read_csv(path, sep=None, engine="python", header=header_row)
 
+    # El export de SBS trae 1-2 filas de título/metadata antes del encabezado
+    # real, así que buscamos la fila que contiene "fecha" en las primeras 10
+    # filas en vez de asumir que el encabezado está en la fila 0.
     crudo = _cargar(None)
+    log("Vista cruda del archivo (primeras 15 filas):\n" + crudo.head(15).to_string())
     header_row = None
     for i in range(min(10, len(crudo))):
         valores = [str(v) for v in crudo.iloc[i].tolist()]
@@ -142,20 +146,33 @@ def parsear_excel(path: Path) -> list[dict]:
 
     df = _cargar(header_row)
     df.columns = [str(c).strip() for c in df.columns]
+    log("Columnas detectadas (fila de encabezado " + str(header_row) + "): " + str(list(df.columns)))
     col_fecha = next((c for c in df.columns if "fecha" in c.lower()), None)
     if col_fecha is None:
         raise ValueError(f"No se encontró columna de fecha tras fijar encabezado en fila {header_row}. Columnas: {list(df.columns)}")
 
     plazo_cols = [c for c in df.columns if c != col_fecha]
     registros = []
-    for _, row in df.iterrows():
+    filas_omitidas = 0
+    for idx, row in df.iterrows():
         fecha_raw = row[col_fecha]
+        # Si hay columnas con nombre duplicado, row[col_fecha] puede venir
+        # como Series en vez de escalar — nos quedamos con el primer valor.
+        if isinstance(fecha_raw, pd.Series):
+            fecha_raw = fecha_raw.iloc[0]
         if pd.isna(fecha_raw):
             continue
-        fecha = pd.to_datetime(fecha_raw, dayfirst=True).date().isoformat()
+        try:
+            fecha = pd.to_datetime(fecha_raw, dayfirst=True).date().isoformat()
+        except Exception as e:
+            filas_omitidas += 1
+            log(f"Fila {idx} omitida: valor de fecha no parseable ({fecha_raw!r}): {e}")
+            continue
         tasas = {}
         for c in plazo_cols:
             val = row[c]
+            if isinstance(val, pd.Series):
+                val = val.iloc[0]
             if pd.isna(val):
                 continue
             try:
@@ -164,6 +181,8 @@ def parsear_excel(path: Path) -> list[dict]:
                 continue
         if tasas:
             registros.append({"fecha": fecha, "tasas": tasas})
+    if filas_omitidas:
+        log(f"Total filas omitidas por fecha no parseable: {filas_omitidas}")
     return registros
 
 
