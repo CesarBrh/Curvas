@@ -1,0 +1,11 @@
+{
+  "CCPSS": {
+    "tipo_curva": "CCPSS",
+    "ejecutado_utc": "2026-09-14T02:08:08.329403Z",
+    "fecha_inicio_consultada": "2026-06-01",
+    "fecha_fin_consultada": "2026-09-14",
+    "status": "error",
+    "error": "Unknown datetime string format, unable to parse: Fecha de Proceso, at position 0",
+    "traceback": "Traceback (most recent call last):\n  File \"/home/runner/work/Curvas/Curvas/sbs-curva-tracker/scripts/fetch_curva.py\", line 193, in main\n    registros = parsear_excel(excel_path)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/Curvas/Curvas/sbs-curva-tracker/scripts/fetch_curva.py\", line 140, in parsear_excel\n    fecha = pd.to_datetime(fecha_raw, dayfirst=True).date().isoformat()\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/pandas/core/tools/datetimes.py\", line 1101, in to_datetime\n    result = convert_listlike(np.array([arg]), format)[0]\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/pandas/core/tools/datetimes.py\", line 435, in _convert_listlike_datetimes\n    result, tz_parsed = objects_to_datetime64(\n                        ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/hostedtoolcache/Python/3.11.16/x64/lib/python3.11/site-packages/pandas/core/arrays/datetimes.py\", line 2398, in objects_to_datetime64\n    result, tz_parsed = tslib.array_to_datetime(\n                        ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"tslib.pyx\", line 414, in pandas._libs.tslib.array_to_datetime\n  File \"tslib.pyx\", line 596, in pandas._libs.tslib.array_to_datetime\n  File \"tslib.pyx\", line 553, in pandas._libs.tslib.array_to_datetime\n  File \"conversion.pyx\", line 641, in pandas._libs.tslibs.conversion.convert_str_to_tsobject\n  File \"parsing.pyx\", line 336, in pandas._libs.tslibs.parsing.parse_datetime_string\n  File \"parsing.pyx\", line 666, in pandas._libs.tslibs.parsing.dateutil_parse\npandas._libs.tslibs.parsing.DateParseError: Unknown datetime string format, unable to parse: Fecha de Proceso, at position 0\n"
+  }
+}
