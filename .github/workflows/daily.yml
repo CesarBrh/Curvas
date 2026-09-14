@@ -1,0 +1,73 @@
+name: Actualizar curvas cupón cero SBS
+
+on:
+  schedule:
+    # 01:30 UTC martes-sábado = 20:30 hora Lima lunes-viernes (después del cierre)
+    - cron: "30 1 * * 2-6"
+  workflow_dispatch:
+    inputs:
+      tipo_curva:
+        description: "Curva a consultar (vacío = las 3 configuradas)"
+        required: false
+        default: ""
+      fecha_inicio:
+        description: "Fecha inicio YYYY-MM-DD (para backfill histórico; vacío = últimos 5 días)"
+        required: false
+        default: ""
+      fecha_fin:
+        description: "Fecha fin YYYY-MM-DD (vacío = hoy)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        tipo_curva: [CCPSS, CCPEDS, CBCRS]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Descargar curva ${{ matrix.tipo_curva }}
+        if: ${{ github.event.inputs.tipo_curva == '' || github.event.inputs.tipo_curva == matrix.tipo_curva }}
+        run: |
+          ARGS="--tipo-curva ${{ matrix.tipo_curva }}"
+          if [ -n "${{ github.event.inputs.fecha_inicio }}" ]; then
+            ARGS="$ARGS --fecha-inicio ${{ github.event.inputs.fecha_inicio }}"
+          fi
+          if [ -n "${{ github.event.inputs.fecha_fin }}" ]; then
+            ARGS="$ARGS --fecha-fin ${{ github.event.inputs.fecha_fin }}"
+          fi
+          python scripts/fetch_curva.py $ARGS
+
+      - name: Subir evidencia de depuración si falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-${{ matrix.tipo_curva }}
+          path: debug/
+          retention-days: 7
+
+      - name: Commit y push del histórico actualizado
+        if: always()
+        run: |
+          git config user.name "sbs-curva-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet || git commit -m "Actualiza ${{ matrix.tipo_curva }} $(date -u +%F)"
+          git pull --rebase origin main || true
+          git push || echo "Sin cambios que subir o conflicto de push (revisar manualmente)"
