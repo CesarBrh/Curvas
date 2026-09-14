@@ -113,23 +113,38 @@ def descargar_excel(tipo_curva: str, fecha_inicio: date, fecha_fin: date, headfu
 def parsear_excel(path: Path) -> list[dict]:
     """
     Convierte el archivo exportado por SBS a una lista de registros:
-    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo_dias>": tasa_pct, ...}}, ...]
+    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo>": tasa_pct, ...}}, ...]
 
-    El layout exacto del archivo no está documentado públicamente, así que el
-    parser es defensivo: busca una columna de fecha y trata el resto de
-    columnas numéricas como plazos (en días). Si el layout viene distinto,
-    lanza un error claro con las columnas encontradas para poder ajustar
-    rápido (revisar debug/*.xlsx en los artifacts del run que falló).
+    El export de SBS trae 1-2 filas de título/metadata antes del encabezado
+    real, así que el parser busca la fila que contiene "fecha" en las
+    primeras filas en vez de asumir que el encabezado está en la fila 0. Si
+    el layout viene distinto, lanza un error claro para poder ajustar rápido
+    (revisar debug/*.xlsx en los artifacts del run que falló).
     """
-    try:
-        df = pd.read_excel(path)
-    except Exception:
-        df = pd.read_csv(path, sep=None, engine="python")
+    def _cargar(header_row):
+        try:
+            return pd.read_excel(path, header=header_row)
+        except Exception:
+            return pd.read_csv(path, sep=None, engine="python", header=header_row)
 
+    crudo = _cargar(None)
+    header_row = None
+    for i in range(min(10, len(crudo))):
+        valores = [str(v) for v in crudo.iloc[i].tolist()]
+        if any("fecha" in v.lower() for v in valores):
+            header_row = i
+            break
+    if header_row is None:
+        raise ValueError(
+            "No se encontró ninguna fila con 'fecha' en las primeras 10 filas del archivo. "
+            f"Primeras filas:\n{crudo.head(10).to_string()}"
+        )
+
+    df = _cargar(header_row)
     df.columns = [str(c).strip() for c in df.columns]
     col_fecha = next((c for c in df.columns if "fecha" in c.lower()), None)
     if col_fecha is None:
-        raise ValueError(f"No se encontró columna de fecha. Columnas: {list(df.columns)}")
+        raise ValueError(f"No se encontró columna de fecha tras fijar encabezado en fila {header_row}. Columnas: {list(df.columns)}")
 
     plazo_cols = [c for c in df.columns if c != col_fecha]
     registros = []
