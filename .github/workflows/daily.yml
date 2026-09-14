@@ -39,11 +39,12 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install -r requirements.txt
+          pip install -r sbs-curva-tracker/requirements.txt
           playwright install --with-deps chromium
 
       - name: Descargar curva ${{ matrix.tipo_curva }}
         if: ${{ github.event.inputs.tipo_curva == '' || github.event.inputs.tipo_curva == matrix.tipo_curva }}
+        working-directory: sbs-curva-tracker
         run: |
           ARGS="--tipo-curva ${{ matrix.tipo_curva }}"
           if [ -n "${{ github.event.inputs.fecha_inicio }}" ]; then
@@ -59,15 +60,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debug-${{ matrix.tipo_curva }}
-          path: debug/
+          path: sbs-curva-tracker/debug/
           retention-days: 7
 
       - name: Commit y push del histórico actualizado
         if: always()
         run: |
+          mkdir -p sbs-curva-tracker/data
           git config user.name "sbs-curva-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add data/
+          git add sbs-curva-tracker/data/
           git diff --staged --quiet || git commit -m "Actualiza ${{ matrix.tipo_curva }} $(date -u +%F)"
           git pull --rebase origin main || true
           git push || echo "Sin cambios que subir o conflicto de push (revisar manualmente)"
