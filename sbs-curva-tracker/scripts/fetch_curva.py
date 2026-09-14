@@ -110,16 +110,32 @@ def descargar_excel(tipo_curva: str, fecha_inicio: date, fecha_fin: date, headfu
     return download_path
 
 
+def _dias_a_años(dias: float) -> str:
+    """Convierte un plazo en días a una clave de años legible (convención 360:
+    90d→0.25, 360d→1, 450d→1.25, etc. — confirmado por los plazos que exporta
+    SBS, todos múltiplos exactos de 90 días)."""
+    años = dias / 360
+    if años == int(años):
+        return str(int(años))
+    return f"{años:.2f}".rstrip("0").rstrip(".")
+
+
 def parsear_excel(path: Path) -> list[dict]:
     """
     Convierte el archivo exportado por SBS a una lista de registros:
-    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo_dias>": tasa_pct, ...}}, ...]
+    [{"fecha": "YYYY-MM-DD", "tasas": {"<plazo_años>": tasa_pct, ...}}, ...]
 
-    El layout exacto del archivo no está documentado públicamente, así que el
-    parser es defensivo: busca una columna de fecha y trata el resto de
-    columnas numéricas como plazos (en días). Si el layout viene distinto,
-    lanza un error claro con las columnas encontradas para poder ajustar
-    rápido (revisar debug/*.xlsx en los artifacts del run que falló).
+    El export de SBS viene en formato LARGO (una fila por combinación
+    fecha × plazo), con una fila de título antes del encabezado real:
+
+        Fila 0: "Rango de fechas del | 01/06/2026 | al | 14/09/2026"  (metadata)
+        Fila 1: "Fecha de Proceso | Tipo de Curva | Plazo (DIAS) | Tasas (%)"  (encabezado real)
+        Fila 2+: datos, ej. "01/06/2026 | CCPSS | 90 | 4.03528"
+
+    OJO: la fila de metadata también contiene la palabra "fecha" (en "Rango
+    de fechas del"), así que buscar solo esa palabra detecta la fila
+    equivocada como encabezado. Por eso exigimos una coincidencia EXACTA con
+    "Fecha de Proceso" (no solo "contiene fecha").
     """
     def _cargar(header_row):
         try:
@@ -127,37 +143,37 @@ def parsear_excel(path: Path) -> list[dict]:
         except Exception:
             return pd.read_csv(path, sep=None, engine="python", header=header_row)
 
-    # El export de SBS trae 1-2 filas de título/metadata antes del encabezado
-    # real, así que buscamos la fila que contiene "fecha" en las primeras 10
-    # filas en vez de asumir que el encabezado está en la fila 0.
     crudo = _cargar(None)
     log("Vista cruda del archivo (primeras 15 filas):\n" + crudo.head(15).to_string())
     header_row = None
     for i in range(min(10, len(crudo))):
-        valores = [str(v) for v in crudo.iloc[i].tolist()]
-        if any("fecha" in v.lower() for v in valores):
+        valores = [str(v).strip().lower() for v in crudo.iloc[i].tolist()]
+        if "fecha de proceso" in valores and any("plazo" in v for v in valores):
             header_row = i
             break
     if header_row is None:
         raise ValueError(
-            "No se encontró ninguna fila con 'fecha' en las primeras 10 filas del archivo. "
-            f"Primeras filas:\n{crudo.head(10).to_string()}"
+            "No se encontró la fila de encabezado ('Fecha de Proceso' + 'Plazo') "
+            f"en las primeras 10 filas del archivo. Primeras filas:\n{crudo.head(10).to_string()}"
         )
 
     df = _cargar(header_row)
     df.columns = [str(c).strip() for c in df.columns]
     log("Columnas detectadas (fila de encabezado " + str(header_row) + "): " + str(list(df.columns)))
-    col_fecha = next((c for c in df.columns if "fecha" in c.lower()), None)
-    if col_fecha is None:
-        raise ValueError(f"No se encontró columna de fecha tras fijar encabezado en fila {header_row}. Columnas: {list(df.columns)}")
 
-    plazo_cols = [c for c in df.columns if c != col_fecha]
-    registros = []
+    col_fecha = next((c for c in df.columns if c.lower() == "fecha de proceso"), None)
+    col_plazo = next((c for c in df.columns if "plazo" in c.lower()), None)
+    col_tasa = next((c for c in df.columns if "tasa" in c.lower()), None)
+    if not (col_fecha and col_plazo and col_tasa):
+        raise ValueError(
+            "No se encontraron las columnas esperadas (fecha/plazo/tasa) tras fijar "
+            f"encabezado en fila {header_row}. Columnas: {list(df.columns)}"
+        )
+
+    por_fecha: dict[str, dict[str, float]] = {}
     filas_omitidas = 0
     for idx, row in df.iterrows():
         fecha_raw = row[col_fecha]
-        # Si hay columnas con nombre duplicado, row[col_fecha] puede venir
-        # como Series en vez de escalar — nos quedamos con el primer valor.
         if isinstance(fecha_raw, pd.Series):
             fecha_raw = fecha_raw.iloc[0]
         if pd.isna(fecha_raw):
@@ -168,21 +184,28 @@ def parsear_excel(path: Path) -> list[dict]:
             filas_omitidas += 1
             log(f"Fila {idx} omitida: valor de fecha no parseable ({fecha_raw!r}): {e}")
             continue
-        tasas = {}
-        for c in plazo_cols:
-            val = row[c]
-            if isinstance(val, pd.Series):
-                val = val.iloc[0]
-            if pd.isna(val):
-                continue
-            try:
-                tasas[str(c)] = float(val)
-            except (TypeError, ValueError):
-                continue
-        if tasas:
-            registros.append({"fecha": fecha, "tasas": tasas})
+
+        plazo_raw = row[col_plazo]
+        tasa_raw = row[col_tasa]
+        if isinstance(plazo_raw, pd.Series):
+            plazo_raw = plazo_raw.iloc[0]
+        if isinstance(tasa_raw, pd.Series):
+            tasa_raw = tasa_raw.iloc[0]
+        if pd.isna(plazo_raw) or pd.isna(tasa_raw):
+            continue
+        try:
+            dias = float(plazo_raw)
+            tasa = float(tasa_raw)
+        except (TypeError, ValueError):
+            continue
+
+        plazo_key = _dias_a_años(dias)
+        por_fecha.setdefault(fecha, {})[plazo_key] = tasa
+
     if filas_omitidas:
         log(f"Total filas omitidas por fecha no parseable: {filas_omitidas}")
+
+    registros = [{"fecha": f, "tasas": t} for f, t in sorted(por_fecha.items())]
     return registros
 
 
