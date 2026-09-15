@@ -12,14 +12,14 @@
   },
   "CCPEDS": {
     "tipo_curva": "CCPEDS",
-    "ejecutado_utc": "2026-09-14T03:40:12.814180Z",
-    "fecha_inicio_consultada": "2024-01-01",
-    "fecha_fin_consultada": "2026-09-14",
+    "ejecutado_utc": "2026-09-15T06:34:38.170976Z",
+    "fecha_inicio_consultada": "2026-09-10",
+    "fecha_fin_consultada": "2026-09-15",
     "status": "ok",
     "nombre": "Curva Cupón Cero Dólares Globales",
-    "registros_totales": 700,
-    "registros_agregados_hoy": 625,
-    "ultima_fecha_dato": "2026-09-11"
+    "registros_totales": 701,
+    "registros_agregados_hoy": 1,
+    "ultima_fecha_dato": "2026-09-14"
   },
   "CBCRS": {
     "tipo_curva": "CBCRS",
