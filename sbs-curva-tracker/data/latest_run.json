@@ -1,14 +1,14 @@
 {
   "CCPSS": {
     "tipo_curva": "CCPSS",
-    "ejecutado_utc": "2026-11-17T09:40:02.923870Z",
-    "fecha_inicio_consultada": "2026-11-12",
-    "fecha_fin_consultada": "2026-11-17",
+    "ejecutado_utc": "2026-11-18T08:59:03.826867Z",
+    "fecha_inicio_consultada": "2026-11-13",
+    "fecha_fin_consultada": "2026-11-18",
     "status": "ok",
     "nombre": "Curva Soberana Soles",
-    "registros_totales": 746,
+    "registros_totales": 747,
     "registros_agregados_hoy": 1,
-    "ultima_fecha_dato": "2026-11-16"
+    "ultima_fecha_dato": "2026-11-17"
   },
   "CCPEDS": {
     "tipo_curva": "CCPEDS",
