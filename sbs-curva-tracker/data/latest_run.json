@@ -1,14 +1,12 @@
 {
   "CCPSS": {
     "tipo_curva": "CCPSS",
-    "ejecutado_utc": "2026-11-19T09:22:39.916739Z",
-    "fecha_inicio_consultada": "2026-11-14",
-    "fecha_fin_consultada": "2026-11-19",
-    "status": "ok",
-    "nombre": "Curva Soberana Soles",
-    "registros_totales": 748,
-    "registros_agregados_hoy": 1,
-    "ultima_fecha_dato": "2026-11-18"
+    "ejecutado_utc": "2026-11-20T09:00:20.401640Z",
+    "fecha_inicio_consultada": "2026-11-15",
+    "fecha_fin_consultada": "2026-11-20",
+    "status": "error",
+    "error": "Timeout esperando respuesta de SBS para CCPSS: Timeout 30000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================",
+    "traceback": "Traceback (most recent call last):\n  File \"/home/runner/work/Curvas/Curvas/sbs-curva-tracker/scripts/fetch_curva.py\", line 97, in descargar_excel\n    with page.expect_download(timeout=30000) as download_info:\n  File \"/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/site-packages/playwright/_impl/_sync_base.py\", line 85, in __exit__\n    self._event.value\n  File \"/opt/hostedtoolcache/Python/3.11.18/x64/lib/python3.11/site-packages/playwright/_impl/_sync_base.py\", line 59, in value\n    raise exception\nplaywright._impl._errors.TimeoutError: Timeout 30000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/runner/work/Curvas/Curvas/sbs-curva-tracker/scripts/fetch_curva.py\", line 249, in main\n    excel_path = descargar_excel(args.tipo_curva, fecha_inicio, fecha_fin, headful=args.headful)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/runner/work/Curvas/Curvas/sbs-curva-tracker/scripts/fetch_curva.py\", line 106, in descargar_excel\n    raise RuntimeError(f\"Timeout esperando respuesta de SBS para {tipo_curva}: {e}\")\nRuntimeError: Timeout esperando respuesta de SBS para CCPSS: Timeout 30000ms exceeded while waiting for event \"download\"\n=========================== logs ===========================\nwaiting for event \"download\"\n============================================================\n"
   },
   "CCPEDS": {
     "tipo_curva": "CCPEDS",
